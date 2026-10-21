@@ -53,6 +53,7 @@ setup(
         "torchvision",
         "av<14",
         "numpy",
+        "imashielding",
     ],
     extras_require={
         "vmas": ["vmas>=1.3.4"],
