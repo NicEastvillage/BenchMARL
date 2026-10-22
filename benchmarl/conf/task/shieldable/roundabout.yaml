@@ -8,3 +8,5 @@ do_shielding: True
 road_length: 32
 max_vel: 4
 min_dist: 4
+vel_reward: 1.0
+violation_penalty: 60.0

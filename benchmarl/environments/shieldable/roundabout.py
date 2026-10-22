@@ -18,7 +18,6 @@ ACT_SIZE = 3
 BRAKE_ACTION = 0
 COAST_ACTION = 1
 ALL_ACTIONS = tuple(range(ACT_SIZE))
-VIOLATION_PENALTY = 1000.0
 
 # Shield statuses for logging. Allows us to detect faulty shields and/or abstractions
 SHIELD_STATUS_OK = 0        # Shield working as expected
@@ -35,6 +34,8 @@ class TaskConfig:
     max_vel: int = MISSING
     min_dist: int = MISSING
     do_shielding: bool = MISSING
+    vel_reward: float = MISSING
+    violation_penalty: float = MISSING
 
 
 @lru_cache(maxsize=16)
@@ -89,6 +90,8 @@ class RoundaboutEnv(EnvBase):
         max_vel: int = 4,
         min_dist: int = 4,
         do_shielding: bool = True,
+        vel_reward: float = 1.0,
+        violation_penalty: float = 60.0,
         device: str = "cpu",
         seed: int = 0,
         **kwargs,
@@ -98,6 +101,8 @@ class RoundaboutEnv(EnvBase):
         self.road_length = road_length
         self.min_dist = min_dist
         self.do_shielding = do_shielding
+        self.vel_reward = vel_reward
+        self.violation_penalty = violation_penalty
 
         self.roundabout, self.abstraction, self.shield = get_shared_roundabout_model_and_shield(
             car_count=n_agents, road_length=road_length, max_vel=max_vel, min_dist=min_dist, do_shielding=do_shielding
@@ -305,7 +310,7 @@ class RoundaboutEnv(EnvBase):
     def _reward(self, povs, action_tensor: Tensor, violated: Tensor) -> Tensor:
         vel = torch.tensor([float(pov.cars[0].vel) for pov in povs], dtype=torch.float32, device=self.device)
         accel_cost = (action_tensor != COAST_ACTION).to(torch.float32)
-        reward = vel - accel_cost - VIOLATION_PENALTY * violated.to(torch.float32)
+        reward = self.vel_reward * vel - accel_cost - self.violation_penalty * violated.to(torch.float32)
         return reward.unsqueeze(-1)
 
     def _set_seed(self, seed: Optional[int]) -> None:
