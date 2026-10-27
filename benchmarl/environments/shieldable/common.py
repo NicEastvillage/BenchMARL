@@ -103,6 +103,23 @@ class ShieldableTaskClass(TaskClass):
             )
             to_log["safety/shield_active_rate"] = (shield_status != SHIELD_STATUS_OFF).to(torch.float).mean().item()
 
+        # Environment statistics. Observation columns are (ego_vel, front_dist, front_vel), and
+        # front_dist is the gap to the car ahead, so min/max over agents are the extreme
+        # gaps between consecutive cars.
+        observation = batch.get(("next", "agents", "observation"), None)
+        if observation is not None and observation.shape[-1] >= 2:
+            to_log["env/average_velocity"] = observation[..., 0].mean().item()
+            to_log["env/min_gap"] = observation[..., 1].min().item()
+            to_log["env/max_gap"] = observation[..., 1].max().item()
+
+        # Travelled distance is cumulative per episode, so read it at episode boundaries.
+        travelled = batch.get(("next", "agents", "travelled_distance"), None)
+        done = batch.get(("next", "done"), None)
+        if travelled is not None and done is not None:
+            episode_distance = travelled.reshape(-1, travelled.shape[-1])[done.squeeze(-1).reshape(-1).bool()]
+            if episode_distance.numel() > 0:
+                to_log["env/average_distance_travelled"] = episode_distance.mean().item()
+
         return to_log
 
     @staticmethod

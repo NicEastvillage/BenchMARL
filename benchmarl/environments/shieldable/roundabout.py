@@ -114,6 +114,7 @@ class RoundaboutEnv(EnvBase):
 
         self.cur_state: RoadNetworkState = self.roundabout.get_init_state()
         self._step_count = 0
+        self._travelled = torch.zeros(n_agents, dtype=torch.float32, device=device)
         self._generator = torch.Generator(device="cpu")
         self._seed = seed
         self._generator.manual_seed(seed)
@@ -134,6 +135,7 @@ class RoundaboutEnv(EnvBase):
             n=2, shape=torch.Size((n, ACT_SIZE)), dtype=torch.bool, device=device
         )
         shield_status_spec = UnboundedDiscrete(shape=torch.Size((n,)), device=device)   # Diagnostics
+        travelled_spec = UnboundedContinuous(shape=torch.Size((n,)), device=device)     # Diagnostics
 
         self.observation_spec = Composite(
             {
@@ -142,6 +144,7 @@ class RoundaboutEnv(EnvBase):
                         "observation": observation_spec,
                         "action_mask": action_mask_spec,
                         "shield_status": shield_status_spec,
+                        "travelled_distance": travelled_spec,
                     },
                     shape=torch.Size((n,)),
                 )
@@ -192,6 +195,7 @@ class RoundaboutEnv(EnvBase):
 
         self.cur_state = self.roundabout.get_init_state()
         self._step_count = 0
+        self._travelled = torch.zeros(self.n_agents, dtype=torch.float32, device=self.device)
         povs = tuple(
             self.abstraction.normalize(self.cur_state, car.id)
             for car in self.cur_state.cars
@@ -204,6 +208,9 @@ class RoundaboutEnv(EnvBase):
 
         self.cur_state = self._sample_successor(actions)
         self._step_count += 1
+        self._travelled = self._travelled + torch.tensor(
+            [car.vel for car in self.cur_state.cars], dtype=torch.float32, device=self.device
+        )
 
         povs = tuple(
             self.abstraction.normalize(self.cur_state, car.id)
@@ -257,6 +264,7 @@ class RoundaboutEnv(EnvBase):
         tensordict_out["agents", "observation"] = self._observations(povs)
         tensordict_out["agents", "action_mask"] = action_mask
         tensordict_out["agents", "shield_status"] = shield_status
+        tensordict_out["agents", "travelled_distance"] = self._travelled
         if reward is not None:
             tensordict_out["agents", "reward"] = reward
         for name, flag in root_flags.items():
