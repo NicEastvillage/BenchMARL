@@ -49,7 +49,7 @@ def get_shared_roundabout_model_and_shield(
     network = RoadNetwork.create_roundabout_scenario(
         car_count=car_count, road_length=road_length, max_vel=max_vel
     )
-    abstraction = AbstractRoundaboutSystem(network, 0)
+    abstraction = AbstractRoundaboutSystem(network)
 
     if not do_shielding:
         return network, abstraction, None
