@@ -34,17 +34,25 @@ class TaskConfig:
     max_vel: int = MISSING
     min_dist: int = MISSING
     do_shielding: bool = MISSING
+    resynthesize_shield: bool = MISSING
     vel_reward: float = MISSING
     violation_penalty: float = MISSING
 
 
 @lru_cache(maxsize=16)
 def get_shared_roundabout_model_and_shield(
-    car_count: int, road_length: int, max_vel: int, min_dist: int, do_shielding: bool
+    car_count: int,
+    road_length: int,
+    max_vel: int,
+    min_dist: int,
+    do_shielding: bool,
+    resynthesize_shield: bool = False,
 ) -> Tuple[RoadNetwork, AbstractRoundaboutSystem, Optional[DGShield]]:
     """Build the road network, abstraction and, optionally, the shield for one configuration.
 
-    Cached because synthesis gets expensive as the road grows.
+    Cached because synthesis gets expensive as the road grows.  The synthesized
+    shield is also cached on disk (see ``imashielding.shield_cache``), so separate
+    runs reuse it unless ``resynthesize_shield`` is set.
     """
     network = RoadNetwork.create_roundabout_scenario(
         car_count=car_count, road_length=road_length, max_vel=max_vel
@@ -54,7 +62,11 @@ def get_shared_roundabout_model_and_shield(
     if not do_shielding:
         return network, abstraction, None
 
-    shield = compute_shield(abstraction, roundabout_safety(min_dist))
+    shield = compute_shield(
+        abstraction,
+        roundabout_safety(min_dist),
+        force_recompute=resynthesize_shield,
+    )
 
     # Check all agent's normalized initial state is defined in the shield
     init_state = network.get_init_state()
@@ -90,6 +102,7 @@ class RoundaboutEnv(EnvBase):
         max_vel: int = 4,
         min_dist: int = 4,
         do_shielding: bool = True,
+        resynthesize_shield: bool = False,
         vel_reward: float = 1.0,
         violation_penalty: float = 60.0,
         device: str = "cpu",
@@ -101,11 +114,17 @@ class RoundaboutEnv(EnvBase):
         self.road_length = road_length
         self.min_dist = min_dist
         self.do_shielding = do_shielding
+        self.resynthesize_shield = resynthesize_shield
         self.vel_reward = vel_reward
         self.violation_penalty = violation_penalty
 
         self.roundabout, self.abstraction, self.shield = get_shared_roundabout_model_and_shield(
-            car_count=n_agents, road_length=road_length, max_vel=max_vel, min_dist=min_dist, do_shielding=do_shielding
+            car_count=n_agents,
+            road_length=road_length,
+            max_vel=max_vel,
+            min_dist=min_dist,
+            do_shielding=do_shielding,
+            resynthesize_shield=resynthesize_shield,
         )
 
         self.safety = roundabout_safety(min_dist)

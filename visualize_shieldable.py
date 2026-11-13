@@ -89,12 +89,16 @@ def load_experiment(checkpoint: Path) -> Experiment:
 
 
 def build_environment(
-    experiment: Experiment, shield_override: Optional[bool] = None
+    experiment: Experiment,
+    shield_override: Optional[bool] = None,
+    resynthesize_shield: bool = False,
 ) -> RoundaboutEnv:
     """Build the road network/environment for the checkpoint's task config."""
     config = dict(experiment.task.config)
     if shield_override is not None:
         config["do_shielding"] = shield_override
+    if resynthesize_shield:
+        config["resynthesize_shield"] = True
     return RoundaboutEnv(**config)
 
 
@@ -155,6 +159,11 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         action="store_true",
         help="Sample from the policy instead of using its deterministic/mode action.",
     )
+    parser.add_argument(
+        "--resynthesize",
+        action="store_true",
+        help="Ignore the on-disk shield cache and synthesize the shield again.",
+    )
     shield_group = parser.add_mutually_exclusive_group()
     shield_group.add_argument(
         "--shield",
@@ -183,7 +192,11 @@ def main(argv: Optional[list[str]] = None) -> None:
 
     print(f"Loading checkpoint: {checkpoint}")
     experiment = load_experiment(checkpoint)
-    env = build_environment(experiment, shield_override=args.shield)
+    env = build_environment(
+        experiment,
+        shield_override=args.shield,
+        resynthesize_shield=args.resynthesize,
+    )
 
     frames = experiment.total_frames
     print(f"  algorithm: {type(experiment.algorithm_config).__name__}")

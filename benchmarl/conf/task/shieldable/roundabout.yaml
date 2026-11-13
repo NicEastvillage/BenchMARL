@@ -5,6 +5,7 @@ defaults:
 n_agents: 5
 max_steps: 200
 do_shielding: True
+resynthesize_shield: False
 road_length: 32
 max_vel: 4
 min_dist: 4
