@@ -2,8 +2,9 @@
 
 The script rebuilds the experiment from the run's ``config.pkl`` (two levels above the
 checkpoint), restores the policy weights from the checkpoint, reconstructs the
-road network for the task configuration, and then hands a ``policy(shields, state)``
-callable to :func:`imashielding.visualize.visualize`.
+road network for the task configuration (roundabout, crossing roads or double
+roundabout), and then hands a ``policy(shields, state)`` callable to
+:func:`imashielding.visualize.visualize`.
 
 Usage
 -----
@@ -30,7 +31,8 @@ import torch
 from tensordict import TensorDict
 from torchrl.envs.utils import ExplorationType, set_exploration_type
 
-from benchmarl.environments.shieldable.roundabout import RoundaboutEnv
+from benchmarl.environments.shieldable.common import ENVIRONMENTS
+from benchmarl.environments.shieldable.road_network import ShieldableRoadNetworkEnv
 from benchmarl.experiment import Experiment
 from imashielding.visualize import visualize
 
@@ -92,19 +94,26 @@ def build_environment(
     experiment: Experiment,
     shield_override: Optional[bool] = None,
     resynthesize_shield: bool = False,
-) -> RoundaboutEnv:
+) -> ShieldableRoadNetworkEnv:
     """Build the road network/environment for the checkpoint's task config."""
+    task_name = experiment.task.name.lower()
+    env_class = ENVIRONMENTS.get(task_name)
+    if env_class is None:
+        raise ValueError(
+            f"Unknown shieldable task '{task_name}'. Known tasks: {sorted(ENVIRONMENTS)}"
+        )
+
     config = dict(experiment.task.config)
     if shield_override is not None:
         config["do_shielding"] = shield_override
     if resynthesize_shield:
         config["resynthesize_shield"] = True
-    return RoundaboutEnv(**config)
+    return env_class(**config)
 
 
 def make_policy(
     experiment: Experiment,
-    env: RoundaboutEnv,
+    env: ShieldableRoadNetworkEnv,
     stochastic: bool = False,
 ) -> Callable:
     """Build the ``policy(shields, state) -> actions`` callable expected by visualize."""
@@ -209,7 +218,7 @@ def main(argv: Optional[list[str]] = None) -> None:
 
     policy = make_policy(experiment, env, stochastic=args.stochastic)
     visualize(
-        env.roundabout,
+        env.network,
         steps=args.steps,
         fps=args.fps,
         policy=policy,

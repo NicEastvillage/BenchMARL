@@ -7,13 +7,22 @@ from torchrl.data import Composite
 from torchrl.envs import EnvBase
 
 from benchmarl.environments.common import Task, TaskClass
-from benchmarl.environments.shieldable.roundabout import (
-    SHIELD_STATUS_OFF,
+from benchmarl.environments.shieldable.crossing_roads import CrossingRoadsEnv
+from benchmarl.environments.shieldable.double_roundabout import DoubleRoundaboutEnv
+from benchmarl.environments.shieldable.road_network import (
     SHIELD_STATUS_MISSING,
+    SHIELD_STATUS_OFF,
+    SHIELD_STATUS_RELEASED,
     SHIELD_STATUS_UNSAFE,
-    RoundaboutEnv,
 )
+from benchmarl.environments.shieldable.roundabout import RoundaboutEnv
 from benchmarl.utils import DEVICE_TYPING
+
+ENVIRONMENTS = {
+    "roundabout": RoundaboutEnv,
+    "crossing_roads": CrossingRoadsEnv,
+    "double_roundabout": DoubleRoundaboutEnv,
+}
 
 
 class ShieldableTaskClass(TaskClass):
@@ -24,14 +33,13 @@ class ShieldableTaskClass(TaskClass):
 
         self.name = self.name.lower()
 
-        if self.name == "roundabout":
-            return lambda: RoundaboutEnv(
+        env_class = ENVIRONMENTS.get(self.name)
+        if env_class is not None:
+            return lambda: env_class(
                 device=device,
                 seed=seed,
                 **config
             )
-        elif self.name == "double_roundabout":
-            raise NotImplementedError("Double Roundabout task has not been implemented yet")
 
         raise AssertionError(f"Unknown scenario name for ShieldableTaskClass: '{self.name}'")
 
@@ -102,15 +110,21 @@ class ShieldableTaskClass(TaskClass):
                 (shield_status == SHIELD_STATUS_UNSAFE).to(torch.float).mean().item()
             )
             to_log["safety/shield_active_rate"] = (shield_status != SHIELD_STATUS_OFF).to(torch.float).mean().item()
+            to_log["safety/shield_released_rate"] = (
+                (shield_status == SHIELD_STATUS_RELEASED).to(torch.float).mean().item()
+            )
 
-        # Environment statistics. Observation columns are (ego_vel, front_dist, front_vel), and
-        # front_dist is the gap to the car ahead, so min/max over agents are the extreme
-        # gaps between consecutive cars.
+        # Environment statistics. Column 0 of the observation is the ego velocity in every
+        # scenario (the ego is the first car block), and ``gap_ahead`` is the distance to the
+        # car in front, so min/max over agents are the extreme gaps between consecutive cars.
         observation = batch.get(("next", "agents", "observation"), None)
-        if observation is not None and observation.shape[-1] >= 2:
+        if observation is not None and observation.shape[-1] >= 1:
             to_log["env/average_velocity"] = observation[..., 0].mean().item()
-            to_log["env/min_gap"] = observation[..., 1].min().item()
-            to_log["env/max_gap"] = observation[..., 1].max().item()
+
+        gap_ahead = batch.get(("next", "agents", "gap_ahead"), None)
+        if gap_ahead is not None:
+            to_log["env/min_gap"] = gap_ahead.min().item()
+            to_log["env/max_gap"] = gap_ahead.max().item()
 
         # Travelled distance is cumulative per episode, so read it at episode boundaries.
         travelled = batch.get(("next", "agents", "travelled_distance"), None)
@@ -130,6 +144,7 @@ class ShieldableTaskClass(TaskClass):
 class ShieldableTask(Task):
 
     ROUNDABOUT = None
+    CROSSING_ROADS = None
     DOUBLE_ROUNDABOUT = None
 
     @staticmethod

@@ -1,0 +1,15 @@
+defaults:
+  - shieldable_double_roundabout_config
+  - _self_
+
+# Two cars keep shield synthesis reasonably cheap. Three or more cars can take hours.
+n_agents: 2
+max_steps: 200
+do_shielding: True
+resynthesize_shield: False
+road_per_roundabout: 32
+max_vel: 4
+min_dist: 3
+merge_space: 8
+vel_reward: 1.0
+violation_penalty: 60.0
