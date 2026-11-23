@@ -222,6 +222,7 @@ def main(argv: Optional[list[str]] = None) -> None:
         steps=args.steps,
         fps=args.fps,
         policy=policy,
+        action_masking=env.shield is not None,
     )
 
 
