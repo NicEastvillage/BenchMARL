@@ -17,8 +17,9 @@ from benchmarl.environments.shieldable.road_network import (
 class TaskConfig:
     n_agents: int = MISSING
     max_steps: int = MISSING
-    road_per_roundabout: int = MISSING
+    road_per_circ: int = MISSING
     max_vel: int = MISSING
+    high_acceleration_chance: float = MISSING
     min_dist: int = MISSING
     merge_space: int = MISSING
     do_shielding: bool = MISSING
@@ -30,8 +31,9 @@ class TaskConfig:
 @lru_cache(maxsize=16)
 def get_shared_double_roundabout_model_and_shield(
     car_count: int,
-    road_per_roundabout: int,
+    road_per_circ: int,
     max_vel: int,
+    high_acceleration_chance: float,
     min_dist: int,
     merge_space: int,
     do_shielding: bool,
@@ -47,7 +49,10 @@ def get_shared_double_roundabout_model_and_shield(
     off unless the configuration changed.
     """
     network = RoadNetwork.create_double_roundabout_scenario(
-        car_count=car_count, road_per_roundabout=road_per_roundabout, max_vel=max_vel
+        car_count=car_count,
+        road_per_circ=road_per_circ,
+        max_vel=max_vel,
+        high_acceleration_chance=high_acceleration_chance,
     )
     abstraction = AbstractRoadNetworkSystem(network)
     safety = road_safety(network, min_dist=min_dist, merge_space=merge_space)
@@ -74,8 +79,9 @@ class DoubleRoundaboutEnv(ShieldableRoadNetworkEnv):
         self,
         n_agents: int = 2,
         max_steps: int = 200,
-        road_per_roundabout: int = 32,
+        road_per_circ: int = 32,
         max_vel: int = 4,
+        high_acceleration_chance: float = 0.2,
         min_dist: int = 3,
         merge_space: int = 8,
         do_shielding: bool = True,
@@ -86,16 +92,18 @@ class DoubleRoundaboutEnv(ShieldableRoadNetworkEnv):
         seed: int = 0,
         **kwargs,
     ):
-        self.road_per_roundabout = road_per_roundabout
+        self.road_per_circ = road_per_circ
         self.max_vel = max_vel
+        self.high_acceleration_chance = high_acceleration_chance
         self.min_dist = min_dist
         self.merge_space = merge_space
         self.resynthesize_shield = resynthesize_shield
 
         network, abstraction, safety, shield = get_shared_double_roundabout_model_and_shield(
             car_count=n_agents,
-            road_per_roundabout=road_per_roundabout,
+            road_per_circ=road_per_circ,
             max_vel=max_vel,
+            high_acceleration_chance=high_acceleration_chance,
             min_dist=min_dist,
             merge_space=merge_space,
             do_shielding=do_shielding,

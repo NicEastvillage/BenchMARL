@@ -7,8 +7,9 @@ n_agents: 2
 max_steps: 200
 do_shielding: True
 resynthesize_shield: False
-road_per_roundabout: 32
+road_per_circ: 32
 max_vel: 4
+high_acceleration_chance: 0.2
 min_dist: 3
 merge_space: 8
 vel_reward: 1.0

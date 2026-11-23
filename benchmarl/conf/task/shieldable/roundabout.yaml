@@ -6,8 +6,9 @@ n_agents: 5
 max_steps: 200
 do_shielding: True
 resynthesize_shield: False
-road_length: 32
+road_per_circ: 32
 max_vel: 4
+high_acceleration_chance: 0.2
 min_dist: 4
 vel_reward: 1.0
 violation_penalty: 60.0

@@ -22,8 +22,9 @@ OBS_SIZE = 3
 class TaskConfig:
     n_agents: int = MISSING
     max_steps: int = MISSING
-    road_length: int = MISSING
+    road_per_circ: int = MISSING
     max_vel: int = MISSING
+    high_acceleration_chance: float = MISSING
     min_dist: int = MISSING
     do_shielding: bool = MISSING
     resynthesize_shield: bool = MISSING
@@ -34,8 +35,9 @@ class TaskConfig:
 @lru_cache(maxsize=16)
 def get_shared_roundabout_model_and_shield(
     car_count: int,
-    road_length: int,
+    road_per_circ: int,
     max_vel: int,
+    high_acceleration_chance: float,
     min_dist: int,
     do_shielding: bool,
     resynthesize_shield: bool = False,
@@ -47,7 +49,10 @@ def get_shared_roundabout_model_and_shield(
     runs reuse it unless ``resynthesize_shield`` is set.
     """
     network = RoadNetwork.create_roundabout_scenario(
-        car_count=car_count, road_length=road_length, max_vel=max_vel
+        car_count=car_count,
+        road_per_circ=road_per_circ,
+        max_vel=max_vel,
+        high_acceleration_chance=high_acceleration_chance,
     )
     abstraction = AbstractRoundaboutSystem(network)
     safety = roundabout_safety(min_dist)
@@ -73,8 +78,9 @@ class RoundaboutEnv(ShieldableRoadNetworkEnv):
         self,
         n_agents: int = 6,
         max_steps: int = 100,
-        road_length: int = 32,
+        road_per_circ: int = 32,
         max_vel: int = 4,
+        high_acceleration_chance: float = 0.2,
         min_dist: int = 4,
         do_shielding: bool = True,
         resynthesize_shield: bool = False,
@@ -84,15 +90,17 @@ class RoundaboutEnv(ShieldableRoadNetworkEnv):
         seed: int = 0,
         **kwargs,
     ):
-        self.road_length = road_length
+        self.road_per_circ = road_per_circ
         self.max_vel = max_vel
+        self.high_acceleration_chance = high_acceleration_chance
         self.min_dist = min_dist
         self.resynthesize_shield = resynthesize_shield
 
         network, abstraction, safety, shield = get_shared_roundabout_model_and_shield(
             car_count=n_agents,
-            road_length=road_length,
+            road_per_circ=road_per_circ,
             max_vel=max_vel,
+            high_acceleration_chance=high_acceleration_chance,
             min_dist=min_dist,
             do_shielding=do_shielding,
             resynthesize_shield=resynthesize_shield,
@@ -122,6 +130,6 @@ class RoundaboutEnv(ShieldableRoadNetworkEnv):
                 front_dist, front_vel = pov.cars[1].pos, pov.cars[1].vel
             else:
                 # Lone car: the car "in front" is itself one full lap ahead.
-                front_dist, front_vel = self.road_length, 0
+                front_dist, front_vel = self.road_per_circ, 0
             rows.append([ego_vel, front_dist, front_vel])
         return torch.tensor(rows, dtype=torch.float32, device=self.device)
