@@ -2,13 +2,13 @@ defaults:
   - shieldable_double_roundabout_config
   - _self_
 
-# Two cars keep shield synthesis reasonably cheap. Three or more cars can take hours.
-n_agents: 2
+# The ego-centric shield does not depend on the number of cars.
+n_agents: 5
 max_steps: 200
 do_shielding: True
 resynthesize_shield: False
-road_per_circ: 32
-max_vel: 4
+road_per_circ: 50
+max_vel: 3
 high_acceleration_chance: 0.2
 min_dist: 3
 merge_space: 8

@@ -3,8 +3,9 @@ from functools import lru_cache
 from typing import Optional, Tuple
 
 from imashielding.roads import RoadNetwork
+from imashielding.roads_egocentric import EgoCentricRoadSystem
 from imashielding.roads_reduction import AbstractRoadNetworkSystem, road_safety
-from imashielding.shield import DGShield
+from imashielding.shield import Shield
 from imashielding.systems import LabelledTransitionSystem
 
 from benchmarl.environments.shieldable.road_network import (
@@ -38,13 +39,15 @@ def get_shared_crossing_roads_model_and_shield(
     merge_space: int,
     do_shielding: bool,
     resynthesize_shield: bool = False,
-) -> Tuple[RoadNetwork, LabelledTransitionSystem, object, Optional[DGShield]]:
+) -> Tuple[RoadNetwork, LabelledTransitionSystem, object, Optional[Shield]]:
     """Build the crossing-roads network, abstraction and, optionally, the shield.
 
-    Shield synthesis scales badly with the number of cars (two cars take seconds,
-    three cars can take hours).  The result is cached on disk by
-    :func:`imashielding.shield.compute_shield`, so keep ``resynthesize_shield``
-    off unless the configuration changed.
+    The shield is synthesized for the ego-centric abstraction
+    (:class:`imashielding.roads_egocentric.EgoCentricRoadSystem`), whose state space does
+    not depend on the number of cars; observations still use the full point of view
+    (:class:`imashielding.roads_reduction.AbstractRoadNetworkSystem`).  The shield is
+    cached on disk by :func:`imashielding.shield.compute_shield`, so keep
+    ``resynthesize_shield`` off unless the configuration changed.
     """
     network = RoadNetwork.create_crossing_roads_scenario(
         car_count=car_count,
@@ -54,8 +57,10 @@ def get_shared_crossing_roads_model_and_shield(
     )
     abstraction = AbstractRoadNetworkSystem(network)
     safety = road_safety(network, min_dist=min_dist, merge_space=merge_space)
+    shield_system = EgoCentricRoadSystem(network, min_dist=min_dist, merge_space=merge_space)
     return build_model_and_shield(
-        network, abstraction, safety, do_shielding, resynthesize_shield
+        network, abstraction, safety, do_shielding, resynthesize_shield,
+        shield_system=shield_system,
     )
 
 
@@ -75,10 +80,10 @@ class CrossingRoadsEnv(ShieldableRoadNetworkEnv):
 
     def __init__(
         self,
-        n_agents: int = 2,
+        n_agents: int = 5,
         max_steps: int = 200,
-        road_per_circ: int = 36,
-        max_vel: int = 2,
+        road_per_circ: int = 50,
+        max_vel: int = 3,
         high_acceleration_chance: float = 0.2,
         min_dist: int = 3,
         merge_space: int = 8,

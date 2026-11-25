@@ -26,7 +26,7 @@ from typing import Callable, List, Optional, Tuple
 
 import torch
 from imashielding.roads import RoadNetwork, RoadNetworkState
-from imashielding.shield import DGShield, compute_shield
+from imashielding.shield import Shield, compute_shield
 from imashielding.systems import LabelledTransitionSystem, StateSafety
 
 from tensordict import TensorDict, TensorDictBase
@@ -54,11 +54,12 @@ def build_model_and_shield(
     safety: Callable[[RoadNetworkState], StateSafety],
     do_shielding: bool,
     resynthesize_shield: bool,
+    shield_system=None,
 ) -> Tuple[
     RoadNetwork,
     LabelledTransitionSystem,
     Callable[[RoadNetworkState], StateSafety],
-    Optional[DGShield],
+    Optional[Shield],
 ]:
     """Build the transition system, safety property and (optionally) the shield.
 
@@ -67,11 +68,24 @@ def build_model_and_shield(
     additionally verify that the synthesized shield covers every agent's initial
     point of view, because an uncovered initial state would be reported as a
     missing shield at runtime instead of failing here with a useful message.
+
+    ``abstraction`` produces the points of view used for observations and for
+    detecting violations.  By default the shield is synthesized for it too.  If
+    ``shield_system`` is given (e.g. an ``EgoCentricRoadSystem``), the shield is
+    synthesized for that system instead and wrapped so that it is queried with
+    the same points of view: a point of view is a concrete state with the agent
+    as car 0, which ``shield_system.normalize(pov, 0)`` maps to its own states.
     """
     if not do_shielding:
         return network, abstraction, safety, None
 
-    shield = compute_shield(abstraction, safety, force_recompute=resynthesize_shield)
+    if shield_system is None:
+        shield = compute_shield(abstraction, safety, force_recompute=resynthesize_shield)
+    else:
+        synthesized = compute_shield(
+            shield_system, shield_system.safety(), force_recompute=resynthesize_shield
+        )
+        shield = synthesized.with_normalizer(lambda pov: shield_system.normalize(pov, 0))
 
     init_state = network.get_init_state()
     problems = []
@@ -103,8 +117,9 @@ class ShieldableRoadNetworkEnv(EnvBase):
     ``[velocity, distance_ahead / network_length, road_one_hot..., position / segment_length, just_merged]``
 
     Cars are ordered by distance ahead and the ego is always the first car; its
-    distance-ahead entry is zero.  This makes the observation Markov with respect
-    to the shield, which is queried with the same normalized point of view.
+    distance-ahead entry is zero.  The shield is queried with the same point of
+    view (possibly through a normalizing wrapper, see :func:`build_model_and_shield`),
+    so it never sees more than the observation does.
     """
 
     #: Fixed observation size, or ``None`` to derive it from the number of cars
@@ -118,7 +133,7 @@ class ShieldableRoadNetworkEnv(EnvBase):
         network: RoadNetwork,
         abstraction,
         safety,
-        shield: Optional[DGShield],
+        shield: Optional[Shield],
         do_shielding: bool,
         vel_reward: float,
         violation_penalty: float,
