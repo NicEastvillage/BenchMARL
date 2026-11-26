@@ -53,6 +53,7 @@ setup(
         "torchvision",
         "av<14",
         "numpy",
+        "matplotlib",
         "imashielding",
     ],
     extras_require={

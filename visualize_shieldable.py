@@ -17,7 +17,9 @@ Usage
     # Start paused, step with `e`, and ignore the shield
     python visualize_shieldable.py <run> --steps 0 --no-shield
 
-Controls: space pauses, `e` single-steps, `r` resets, `esc` quits.
+Controls: space pauses, `e` single-steps, `r` resets, `p` cycles the policy
+(learned, random, greedy; random and greedy use the run's shield), `s` toggles
+the shield (for all policies; only if the run has one), `esc` quits.
 """
 
 from __future__ import annotations
@@ -119,13 +121,16 @@ def make_policy(
     """Build the ``policy(shields, state) -> actions`` callable expected by visualize."""
     exploration = ExplorationType.RANDOM if stochastic else ExplorationType.DETERMINISTIC
 
-    def policy(_shields, state) -> tuple[int, ...]:
+    def policy(shields, state) -> tuple[int, ...]:
         # Exactly the observation + action mask the environment gives the policy.
         povs = tuple(
             env.abstraction.normalize(state, car.id) for car in state.cars
         )
         observation = env._observations(povs)
         action_mask, _ = env._action_mask(povs)
+        if not shields:
+            # The shield is toggled off in the visualizer (key S): allow every action.
+            action_mask = torch.ones_like(action_mask)
 
         tensordict = TensorDict(
             {
@@ -217,10 +222,19 @@ def main(argv: Optional[list[str]] = None) -> None:
     print(f"  actions:   {'stochastic' if args.stochastic else 'deterministic'}")
 
     policy = make_policy(experiment, env, stochastic=args.stochastic)
+    shields = {}
+    if env.shield is not None:
+        shields = {
+            car.id: env.shield.with_normalizer(
+                lambda state, agent=car.id: env.abstraction.normalize(state, agent)
+            )
+            for car in env.network.cars
+        }
     visualize(
         env.network,
         steps=args.steps,
         fps=args.fps,
+        shields=shields,
         policy=policy,
         action_masking=env.shield is not None,
     )
