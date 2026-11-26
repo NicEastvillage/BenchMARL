@@ -94,9 +94,25 @@ class ShieldableTaskClass(TaskClass):
             return {}
 
         to_log = {
+            # Per agent-step: fraction of (step, agent) pairs at which a violation occurred.
             "safety/violation_rate": terminated.any(-1).to(torch.float).mean().item(),
         }
 
+        # Per episode: of the episodes that ended in this batch, the fraction that ended in a
+        # violation (terminated) rather than by reaching max_steps (truncated only). A step
+        # that is both terminated and truncated counts as a violation. Not logged when no
+        # episode ended in the batch, so the curve has gaps rather than misleading zeros.
+        episode_done = batch.get(("next", "done"), None)
+        episode_terminated = batch.get(("next", "terminated"), None)
+        if episode_done is not None and episode_terminated is not None:
+            n_ended = episode_done.to(torch.float).sum()
+            if n_ended > 0:
+                n_violated = (episode_terminated & episode_done).to(torch.float).sum()
+                to_log["safety/episode_violation_rate"] = (n_violated / n_ended).item()
+                to_log["safety/episodes_ended"] = n_ended.item()
+
+        # Per agent-step: the fraction of the action set left available by the mask,
+        # averaged over every (step, agent) pair in the batch (and over actions).
         action_mask = batch.get(("agents", "action_mask"), None)
         if action_mask is not None:
             to_log["safety/legal_action_rate"] = action_mask.to(torch.float).mean().item()
@@ -133,6 +149,15 @@ class ShieldableTaskClass(TaskClass):
             episode_distance = travelled.reshape(-1, travelled.shape[-1])[done.squeeze(-1).reshape(-1).bool()]
             if episode_distance.numel() > 0:
                 to_log["env/average_distance_travelled"] = episode_distance.mean().item()
+
+        # Episode length is a running step counter, so like travelled distance it is read on
+        # the step where each episode ends. Mean over the episodes that ended in this batch.
+        episode_length = batch.get(("next", "agents", "episode_length"), None)
+        if episode_length is not None and done is not None:
+            ended = done.squeeze(-1).reshape(-1).bool()
+            lengths = episode_length.reshape(-1, episode_length.shape[-1])[ended][:, 0]
+            if lengths.numel() > 0:
+                to_log["env/mean_episode_length"] = lengths.mean().item()
 
         return to_log
 

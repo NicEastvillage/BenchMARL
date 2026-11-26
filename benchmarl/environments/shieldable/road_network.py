@@ -189,6 +189,7 @@ class ShieldableRoadNetworkEnv(EnvBase):
         shield_status_spec = UnboundedDiscrete(shape=torch.Size((n,)), device=device)   # Diagnostics
         travelled_spec = UnboundedContinuous(shape=torch.Size((n,)), device=device)     # Diagnostics
         gap_spec = UnboundedContinuous(shape=torch.Size((n,)), device=device)           # Diagnostics
+        episode_length_spec = UnboundedContinuous(shape=torch.Size((n,)), device=device)  # Diagnostics
 
         self.observation_spec = Composite(
             {
@@ -199,6 +200,7 @@ class ShieldableRoadNetworkEnv(EnvBase):
                         "shield_status": shield_status_spec,
                         "travelled_distance": travelled_spec,
                         "gap_ahead": gap_spec,
+                        "episode_length": episode_length_spec,
                     },
                     shape=torch.Size((n,)),
                 )
@@ -320,6 +322,10 @@ class ShieldableRoadNetworkEnv(EnvBase):
         tensordict_out["agents", "shield_status"] = shield_status
         tensordict_out["agents", "travelled_distance"] = self._travelled
         tensordict_out["agents", "gap_ahead"] = self._gaps_ahead(povs)
+        # Steps taken so far in this episode (same for every agent); read at episode end.
+        tensordict_out["agents", "episode_length"] = torch.full(
+            (n,), float(self._step_count), dtype=torch.float32, device=self.device
+        )
         if reward is not None:
             tensordict_out["agents", "reward"] = reward
         for name, flag in root_flags.items():

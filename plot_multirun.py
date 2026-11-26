@@ -29,15 +29,18 @@ import numpy as np
 # (csv key, plot title, y axis label). The csv key is the metric name with '/' -> '_',
 # matching the file name under the run's `scalars/` folder.
 METRICS: List[Tuple[str, str, str]] = [
-    ("safety/violation_rate", "Safety violation rate", "fraction of agent-steps"),
-    ("safety/legal_action_rate", "Legal action rate", "fraction of actions"),
-    ("safety/shield_no_safe_action_rate", "Shield no-safe-action rate", "fraction of queries"),
+    ("safety/episode_violation_rate", "Safety violation rate (in episodes)",
+     "fraction of episodes ending in a violation"),
+    ("safety/violation_rate", "Safety violation rate (in steps)", "fraction of steps resulting in violation"),
+    ("safety/legal_action_rate", "Available actions (per agent-step)",
+     "mean fraction of actions available"),
     ("collection/agents/reward/episode_reward/mean", "Episode reward (sampled policy)", "reward"),
     ("eval/reward/episode_reward/mean", "Episode reward (deterministic policy)", "reward"),
-    ("env/average_velocity", "Average velocity", "cells / step"),
-    ("env/min_gap", "Minimum gap between consecutive cars", "cells"),
-    ("env/max_gap", "Maximum gap between consecutive cars", "cells"),
-    ("env/average_distance_travelled", "Average distance travelled", "cells per episode"),
+    ("env/average_velocity", "Average velocity", "Velocity"),
+    ("env/min_gap", "Minimum gap between consecutive cars", "distance"),
+    ("env/max_gap", "Maximum gap between consecutive cars", "distance"),
+    ("env/average_distance_travelled", "Average distance travelled per episode", "distance"),
+    ("env/mean_episode_length", "Mean episode length (per finished episode)", "steps"),
 ]
 
 # Columns used as the x axis (in preference order). These are logged per iteration.
